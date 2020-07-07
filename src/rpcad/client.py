@@ -1,0 +1,55 @@
+#!/usr/bin/env python3
+# -*- coding:utf-8 -*-
+"""
+@Author:               Daumantas Kavolis <dkavolis>
+@Date:                 06-Jun-2020
+@Filename:             client.py
+@Last Modified By:     Daumantas Kavolis
+@Last Modified Time:   07-Jul-2020
+"""
+
+import rpyc
+from rpcad import RPCAD_PORT, RPCAD_FALLBACK_PORT, RPCAD_HOST
+from typing import Union, Dict
+from rpcad.parameter import Parameter
+
+
+class Client:
+    def __init__(self, hostname: str = RPCAD_HOST, port: int = RPCAD_PORT):
+        try:
+            self.connection = rpyc.connect(hostname, port)
+        except:  # noqa: E722
+            self.connection = rpyc.connect(hostname, RPCAD_FALLBACK_PORT)
+
+    def __enter__(self) -> "Client":
+        return self
+
+    def __exit__(self, type, value, traceback) -> None:
+        self.close()
+
+    def close(self) -> None:
+        self.connection.close()
+
+    def parameter(self, name: str) -> Parameter:
+        return self.connection.root.parameter(name)
+
+    def parameters(self) -> Dict[str, Parameter]:
+        return self.connection.root.parameters()
+
+    def open_project(self, path: str) -> None:
+        return self.connection.root.open_project(path)
+
+    def save_project(self) -> None:
+        return self.connection.root.save_project()
+
+    def close_project(self) -> None:
+        return self.connection.root.close_project()
+
+    def export_project(self, path: str, *args, **kwargs) -> None:
+        return self.connection.root.export_project(path, *args, **kwargs)
+
+    def set_parameter(self, name: str, expression: Union[str, float]) -> None:
+        return self.connection.root.set_parameter(name, expression)
+
+    def set_parameters(self, parameters: Dict[str, Union[str, float]]) -> None:
+        return self.connection.root.set_parameter(parameters)
