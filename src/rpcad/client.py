@@ -15,11 +15,12 @@ from rpcad.parameter import Parameter
 
 
 class Client:
-    def __init__(self, hostname: str = RPCAD_HOST, port: int = RPCAD_PORT):
+    def __init__(self, hostname: str = RPCAD_HOSTNAME, port: int = RPCAD_PORT):
+        config = {"allow_public_attrs": True}
         try:
-            self.connection = rpyc.connect(hostname, port)
+            self.connection = rpyc.connect(hostname, port, config=config)
         except:  # noqa: E722
-            self.connection = rpyc.connect(hostname, RPCAD_FALLBACK_PORT)
+            self.connection = rpyc.connect(hostname, RPCAD_FALLBACK_PORT, config=config)
 
     def __enter__(self) -> "Client":
         return self
