@@ -5,12 +5,13 @@
 @Date:                 06-Jun-2020
 @Filename:             client.py
 @Last Modified By:     Daumantas Kavolis
-@Last Modified Time:   07-Jul-2020
+@Last Modified Time:   08-Jul-2020
 """
 
+from typing import Dict, Union
+
 import rpyc
-from rpcad import RPCAD_PORT, RPCAD_FALLBACK_PORT, RPCAD_HOST
-from typing import Union, Dict
+from rpcad.common import RPCAD_FALLBACK_PORT, RPCAD_HOSTNAME, RPCAD_PORT
 from rpcad.parameter import Parameter
 
 
