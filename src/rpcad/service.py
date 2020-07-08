@@ -79,6 +79,9 @@ class CADService(rpyc.Service):
 
     def exposed_set_parameters(self, parameters: Dict[str, Union[str, float]]) -> None:
         for name, expression in parameters.items():
+            # for weird reasons dict key is Tuple[str]...
+            if isinstance(name, tuple) and len(name) == 1:
+                name = name[0]
             self._set_parameter(name, expression)
 
     @classmethod
