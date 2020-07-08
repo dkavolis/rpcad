@@ -10,8 +10,6 @@ except DistributionNotFound:
 finally:
     del get_distribution, DistributionNotFound
 
-import os
-
 
 def ensure_rpyc():
     try:
@@ -28,8 +26,35 @@ ensure_rpyc()
 del ensure_rpyc
 
 
-RPCAD_HOSTNAME = os.environ.get("RPCAD_HOSTNAME", "localhost")
-RPCAD_PORT = os.environ.get("RPCAD_PORT", 18_888)
-RPCAD_FALLBACK_PORT = os.environ.get("RPCAD_FALLBACK_PORT", 18_898)
+def reload_service_modules(*args):
+    from rpcad import common, parameter, service
+    import importlib
 
-del os
+    importlib.reload(common)
+    importlib.reload(parameter)
+    importlib.reload(service)
+    for module in args:
+        importlib.reload(module)
+
+
+# above is setup needed for submodules
+from rpcad.client import Client  # noqa: E402
+from rpcad.parameter import Parameter  # noqa: E402
+from rpcad.common import (  # noqa: E402
+    RPCAD_HOSTNAME,
+    RPCAD_PORT,
+    RPCAD_FALLBACK_PORT,
+    RPCAD_LOGDIR,
+    RPCAD_LOGLEVEL,
+)
+
+__all__ = [
+    "Client",
+    "Parameter",
+    "RPCAD_HOSTNAME",
+    "RPCAD_PORT",
+    "RPCAD_FALLBACK_PORT",
+    "RPCAD_LOGDIR",
+    "RPCAD_LOGLEVEL",
+    "reload_service_modules",
+]
