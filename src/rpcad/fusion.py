@@ -5,17 +5,20 @@
 @Date:                 05-Jun-2020
 @Filename:             fusion.py
 @Last Modified By:     Daumantas Kavolis
-@Last Modified Time:   07-Jul-2020
+@Last Modified Time:   08-Jul-2020
 """
 
-from rpcad.service import CADService
-from rpcad.parameter import Parameter
-from typing import Dict, Union, Optional
-
+import logging
 import os
+from typing import Dict, Optional, Union
+
+from rpcad.parameter import Parameter
+from rpcad.service import CADService
 
 import adsk.core
 import adsk.fusion
+
+logger = logging.getLogger(__name__)
 
 
 class Fusion360Service(CADService):
@@ -65,6 +68,8 @@ class Fusion360Service(CADService):
             options = import_manager.createIGESImportOptions(path)
         elif extension == ".f3d":
             options = import_manager.createFusionArchiveImportOptions(path)
+        else:
+            raise ValueError(f"Invalid extension {extension}")
 
         self._document = import_manager.importToNewDocument(options)
 
@@ -88,6 +93,15 @@ class Fusion360Service(CADService):
         self._design = None
 
     def _export_project(self, path: str, *args, **kwargs) -> None:
+        """
+        Use kwargs to pass additional export values
+
+        stl:
+            body: str
+                name of the body to export
+            https://help.autodesk.com/view/fusion360/ENU/?guid=GUID-64f3e0ab-f3bc-445e-9505-7dba9d296ebd
+        """
+
         if self._design is None:
             raise RuntimeError("No open documents")
 
@@ -99,8 +113,17 @@ class Fusion360Service(CADService):
         extension = os.path.splitext(path)[1]
 
         if extension == ".stl":
-            root = self._design.rootComponent
-            options = export_manager.createSTLExportOptions(root, path)
+            body = self._design.rootComponent
+            body_name = kwargs.pop("body", None)
+            if body_name is not None:
+                bodies = self._design.rootComponent.meshBodies
+                body = bodies.item(0)
+                for i in range(bodies.count):
+                    if bodies.item(i).name == body_name:
+                        body = bodies.item(i)
+                        break
+
+            options = export_manager.createSTLExportOptions(body, path)
         elif extension == ".step":
             options = export_manager.createSTEPExportOptions(path)
         elif extension == ".smt":
@@ -111,6 +134,11 @@ class Fusion360Service(CADService):
             options = export_manager.createIGESExportOptions(path)
         elif extension == ".f3d":
             options = export_manager.createFusionArchiveExportOptions(path)
+        else:
+            raise ValueError(f"Invalid extension {extension}")
+
+        for attr, value in kwargs.items():
+            setattr(options, attr, value)
 
         export_manager.execute(options)
 
@@ -119,10 +147,15 @@ class Fusion360Service(CADService):
             raise RuntimeError("No open projects")
 
         param = self._design.allParameters.itemByName(name)
+        if param is None:
+            raise ValueError(f"Invalid parameter name {name}")
+
         if isinstance(parameter, str):
             param.expression = parameter
         else:
             param.value = parameter
+
+        logger.debug("Set parameter %s = %s (%s)", name, param.expression, parameter)
 
 
 def cast(parameter: adsk.fusion.Parameter) -> Parameter:

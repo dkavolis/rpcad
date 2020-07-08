@@ -5,26 +5,71 @@
 @Date:                 05-Jun-2020
 @Filename:             service.py
 @Last Modified By:     Daumantas Kavolis
-@Last Modified Time:   07-Jul-2020
+@Last Modified Time:   09-Jul-2020
 """
 
-import rpyc
-from rpcad import RPCAD_PORT, RPCAD_FALLBACK_PORT, RPCAD_HOSTNAME
-from rpcad.parameter import Parameter
+import logging
 from abc import abstractmethod
+from logging import handlers
 from typing import Dict, Union
+
+import rpyc
+from rpcad.common import (
+    RPCAD_FALLBACK_PORT,
+    RPCAD_HOSTNAME,
+    RPCAD_LOGDIR,
+    RPCAD_LOGLEVEL,
+    RPCAD_PORT,
+)
+from rpcad.parameter import Parameter
+
+logger = logging.getLogger(__name__)
+
+
+def setup_service_logger(service_name: str) -> logging.Handler:
+    import os
+
+    logger = logging.getLogger("rpcad")
+    logger.setLevel(getattr(logging, RPCAD_LOGLEVEL, logging.DEBUG))
+    formatter = logging.Formatter(
+        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    )
+    logdir = os.path.abspath(RPCAD_LOGDIR)
+    logHandler = handlers.RotatingFileHandler(
+        os.path.join(logdir, f"{service_name}.log"),
+        mode="a+",
+        backupCount=5,
+        delay=True,
+    )
+    logHandler.setFormatter(formatter)
+    logHandler.flush()
+    logger.addHandler(logHandler)
+    logger.info("Log level is set to %s", logger.getEffectiveLevel())
+
+    return logHandler
+
+
+def finish_service_logger(handler: logging.Handler) -> None:
+    if handler is None:
+        return
+
+    logger = logging.getLogger("rpcad")
+    logger.removeHandler(handler)
 
 
 class CADService(rpyc.Service):
     def on_connect(self, conn):
         # code that runs when a connection is created
         # (to init the service, if needed)
-        pass
+        self.handler = setup_service_logger(self.__class__.__name__)
+        logger.info("Service starting: %s", self.__class__.__name__)
 
     def on_disconnect(self, conn):
         # code that runs after the connection has already closed
         # (to finalize the service, if needed)
-        pass
+        if self.handler is not None:
+            self.handler.flush()
+            finish_service_logger(self.handler)
 
     # abstract methods to be implemented by specific service
     @abstractmethod
