@@ -53,4 +53,4 @@ class Client:
         return self.connection.root.set_parameter(name, expression)
 
     def set_parameters(self, parameters: Dict[str, Union[str, float]]) -> None:
-        return self.connection.root.set_parameter(parameters)
+        return self.connection.root.set_parameters(parameters)
