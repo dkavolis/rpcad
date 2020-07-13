@@ -5,9 +5,10 @@
 @Date:                 06-Jun-2020
 @Filename:             client.py
 @Last Modified By:     Daumantas Kavolis
-@Last Modified Time:   08-Jul-2020
+@Last Modified Time:   13-Jul-2020
 """
 
+import os
 from typing import Dict, Union
 
 import rpyc
@@ -39,7 +40,7 @@ class Client:
         return self.connection.root.parameters()
 
     def open_project(self, path: str) -> None:
-        return self.connection.root.open_project(path)
+        return self.connection.root.open_project(os.path.abspath(path))
 
     def save_project(self) -> None:
         return self.connection.root.save_project()
@@ -48,7 +49,9 @@ class Client:
         return self.connection.root.close_project()
 
     def export_project(self, path: str, *args, **kwargs) -> None:
-        return self.connection.root.export_project(path, *args, **kwargs)
+        return self.connection.root.export_project(
+            os.path.abspath(path), *args, **kwargs
+        )
 
     def set_parameter(self, name: str, expression: Union[str, float]) -> None:
         return self.connection.root.set_parameter(name, expression)
