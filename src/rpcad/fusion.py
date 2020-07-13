@@ -5,7 +5,7 @@
 @Date:                 05-Jun-2020
 @Filename:             fusion.py
 @Last Modified By:     Daumantas Kavolis
-@Last Modified Time:   08-Jul-2020
+@Last Modified Time:   13-Jul-2020
 """
 
 import logging
@@ -150,10 +150,16 @@ class Fusion360Service(CADService):
         if param is None:
             raise ValueError(f"Invalid parameter name {name}")
 
-        if isinstance(parameter, str):
-            param.expression = parameter
-        else:
-            param.value = parameter
+        try:
+            if isinstance(parameter, str):
+                param.expression = str(parameter)
+            else:
+                param.value = float(parameter)
+        except TypeError:
+            logger.exception(
+                "Failed setting '%s' to '%s'(%s)", name, parameter, type(parameter)
+            )
+            raise
 
         logger.debug("Set parameter %s = %s (%s)", name, param.expression, parameter)
 
