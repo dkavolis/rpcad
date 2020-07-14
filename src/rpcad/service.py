@@ -11,7 +11,7 @@
 import logging
 from abc import abstractmethod
 from logging import handlers
-from typing import Dict, Union
+from typing import Dict, Union, Type
 
 import rpyc
 from rpcad.common import (
@@ -22,6 +22,7 @@ from rpcad.common import (
     RPCAD_PORT,
 )
 from rpcad.parameter import Parameter
+from rpyc.utils.server import Server, ThreadedServer
 
 logger = logging.getLogger(__name__)
 
@@ -138,13 +139,17 @@ class CADService(rpyc.Service):
 
     @classmethod
     def create_server(
-        cls, *args, hostname=RPCAD_HOSTNAME, port=RPCAD_PORT, **kwargs
-    ) -> rpyc.ThreadedServer:
-        from rpyc.utils.server import ThreadedServer
+        cls,
+        *args,
+        hostname=RPCAD_HOSTNAME,
+        port=RPCAD_PORT,
+        server: Type[Server] = ThreadedServer,
+        **kwargs,
+    ) -> Server:
 
         kwargs["protocol_config"] = {"allow_public_attrs": True}
 
         try:
-            return ThreadedServer(cls, *args, port=port, **kwargs)
+            return server(cls, *args, port=port, **kwargs)
         except OSError:
-            return ThreadedServer(cls, *args, port=RPCAD_FALLBACK_PORT, **kwargs)
+            return server(cls, *args, port=RPCAD_FALLBACK_PORT, **kwargs)
