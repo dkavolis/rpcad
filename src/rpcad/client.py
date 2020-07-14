@@ -61,3 +61,9 @@ class Client:
 
     def undo(self, count: int = 1) -> None:
         return self.connection.root.undo(count)
+
+    def reload(self) -> None:
+        return self.connection.root.reload()
+
+    def debug(self) -> None:
+        return self.connection.root.debug()

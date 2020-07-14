@@ -174,6 +174,20 @@ class Fusion360Service(CADService):
             if not self._undo_command.execute():
                 break
 
+    def _reload(self):
+        if self._document is None:
+            raise RuntimeError("No open projects")
+
+        data_file = self._document.dataFile
+        self._document.close(False)
+        self._document = self._app.documents.open(data_file)
+
+    def _debug(self):
+        self.app = self._app
+        self.document = self._document
+        self.design = self._design
+        self.undo_command = self._undo_command
+
 
 def cast(parameter: adsk.fusion.Parameter) -> Parameter:
     return Parameter(value=parameter.value, expression=parameter.expression)

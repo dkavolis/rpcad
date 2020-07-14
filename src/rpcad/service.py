@@ -105,6 +105,14 @@ class CADService(rpyc.Service):
     def _undo(self, count: int) -> None:
         pass
 
+    @abstractmethod
+    def _reload(self) -> None:
+        pass
+
+    @abstractmethod
+    def _debug(self) -> None:
+        pass
+
     # expose service methods
     def exposed_parameter(self, name: str) -> Parameter:
         return self._get_parameter(name)
@@ -136,6 +144,12 @@ class CADService(rpyc.Service):
 
     def exposed_undo(self, count: int = 1) -> None:
         self._undo(count)
+
+    def exposed_reload(self) -> None:
+        self._reload()
+
+    def exposed_debug(self) -> None:
+        self._debug()
 
     @classmethod
     def create_server(
