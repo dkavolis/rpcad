@@ -171,7 +171,8 @@ class Fusion360Service(CADService):
             raise RuntimeError("No open projects")
 
         for _ in range(count):
-            self._undo_command.execute()
+            if not self._undo_command.execute():
+                break
 
 
 def cast(parameter: adsk.fusion.Parameter) -> Parameter:
