@@ -5,7 +5,7 @@
 @Date:                 06-Jun-2020
 @Filename:             client.py
 @Last Modified By:     Daumantas Kavolis
-@Last Modified Time:   13-Jul-2020
+@Last Modified Time:   14-Jul-2020
 """
 
 import os
@@ -58,3 +58,6 @@ class Client:
 
     def set_parameters(self, parameters: Dict[str, Union[str, float]]) -> None:
         return self.connection.root.set_parameters(parameters)
+
+    def undo(self, count: int = 1) -> None:
+        return self.connection.root.undo(count)

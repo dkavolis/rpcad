@@ -5,7 +5,7 @@
 @Date:                 05-Jun-2020
 @Filename:             service.py
 @Last Modified By:     Daumantas Kavolis
-@Last Modified Time:   09-Jul-2020
+@Last Modified Time:   14-Jul-2020
 """
 
 import logging
@@ -100,6 +100,10 @@ class CADService(rpyc.Service):
     def _set_parameter(self, name: str, parameter: Union[str, float]) -> None:
         pass
 
+    @abstractmethod
+    def _undo(self, count: int) -> None:
+        pass
+
     # expose service methods
     def exposed_parameter(self, name: str) -> Parameter:
         return self._get_parameter(name)
@@ -128,6 +132,9 @@ class CADService(rpyc.Service):
             if isinstance(name, tuple) and len(name) == 1:
                 name = name[0]
             self._set_parameter(name, expression)
+
+    def exposed_undo(self, count: int = 1) -> None:
+        self._undo(count)
 
     @classmethod
     def create_server(

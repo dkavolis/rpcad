@@ -5,7 +5,7 @@
 @Date:                 05-Jun-2020
 @Filename:             fusion.py
 @Last Modified By:     Daumantas Kavolis
-@Last Modified Time:   13-Jul-2020
+@Last Modified Time:   14-Jul-2020
 """
 
 import logging
@@ -29,6 +29,9 @@ class Fusion360Service(CADService):
         self._design: Optional[adsk.fusion.Design] = adsk.fusion.Design.cast(
             self._app.activeProduct
         )
+
+        ui = self._app.userInterface
+        self._undo_command = ui.commandDefinitions.itemById("UndoCommand")
 
     def on_connect(self, conn):
         super().on_connect(conn)
@@ -162,6 +165,13 @@ class Fusion360Service(CADService):
             raise
 
         logger.debug("Set parameter %s = %s (%s)", name, param.expression, parameter)
+
+    def _undo(self, count: int):
+        if self._design is None or self._undo_command is None:
+            raise RuntimeError("No open projects")
+
+        for _ in range(count):
+            self._undo_command.execute()
 
 
 def cast(parameter: adsk.fusion.Parameter) -> Parameter:
