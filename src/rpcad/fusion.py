@@ -167,7 +167,7 @@ class Fusion360Service(CADService):
         logger.debug("Set parameter %s = %s (%s)", name, param.expression, parameter)
 
     def _undo(self, count: int):
-        if self._design is None or self._undo_command is None:
+        if self._undo_command is None:
             raise RuntimeError("No open projects")
 
         for _ in range(count):
@@ -181,6 +181,7 @@ class Fusion360Service(CADService):
         data_file = self._document.dataFile
         self._document.close(False)
         self._document = self._app.documents.open(data_file)
+        self._design = adsk.fusion.Design.cast(self._app.activeProduct)
 
     def _debug(self):
         self.app = self._app
