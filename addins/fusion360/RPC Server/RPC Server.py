@@ -4,7 +4,8 @@
 import os
 import sys
 import traceback
-from threading import Thread
+
+# from threading import Thread
 
 import adsk.cam
 import adsk.core
@@ -16,13 +17,19 @@ sys.path.append(os.path.dirname(__file__))
 SERVER = None
 PROCESS = None
 
+# Fusion360 doesn't like it's API called from worker threads so have to use plugin with
+# a server in main thread, have to relaunch server for new connections
+# Threaded server works ok at low API call rates but completely breaks down when many
+# commands are executed sequentially
+
 
 def start_service():
     sys.path.append(os.path.dirname(os.path.abspath(__file__)))
     from rpcad.fusion import Fusion360Service
+    from rpyc.utils.server import OneShotServer
 
     global SERVER
-    SERVER = Fusion360Service.create_server()
+    SERVER = Fusion360Service.create_server(server=OneShotServer)
     SERVER.start()
 
 
@@ -40,14 +47,16 @@ def run(context):
         # make sure any changes are pickup by fusion 360 on restart
         reload_service_modules(fusion)
 
-        PROCESS = Thread(target=start_service, daemon=True)
-        PROCESS.start()
+        # PROCESS = Thread(target=start_service, daemon=True)
+        # PROCESS.start()
+        start_service()
 
     except:  # noqa: E722
         if ui:
             ui.messageBox("Failed:\n{}".format(traceback.format_exc()))
 
 
+# not used in scripts but left for possible addin functionality
 def stop(context):
     ui = None
     try:

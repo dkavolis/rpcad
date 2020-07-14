@@ -1,13 +1,12 @@
 {
 	"autodeskProduct":	"Fusion360",
-	"type":	"addin",
+	"type":	"script",
 	"id":	"50d51849-0709-4bcb-b3c4-e77808735e30",
 	"author":	"D. Kavolis",
 	"description":	{
 		"":	"RPC server for modifying designs."
 	},
 	"version":	"0.1",
-	"runOnStartup":	true,
 	"supportedOS":	"windows|mac",
 	"editEnabled":	true
 }

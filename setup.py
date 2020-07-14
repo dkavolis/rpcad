@@ -36,7 +36,7 @@ class PostInstallCommand(install):
     def install_win(self):
         self.install_fusion360(
             os.path.expandvars("%LocalAppData%/Autodesk/webdeploy/production"),
-            os.path.expandvars("%AppData%/Autodesk/Autodesk Fusion 360/API/AddIns"),
+            os.path.expandvars("%AppData%/Autodesk/Autodesk Fusion 360/API/Scripts"),
         )
 
     def install_mac(self):
