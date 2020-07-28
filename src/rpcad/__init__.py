@@ -14,11 +14,13 @@ finally:
 def ensure_rpyc():
     try:
         import rpyc
-    except ImportError:
+    except (ImportError, ModuleNotFoundError):
         import subprocess
         import sys
 
-        subprocess.call([sys.executable, "-m", "pip", "install", "rpyc", "--user"])
+        subprocess.run(
+            [sys.executable, "-m", "pip", "install", "rpyc", "--user"], check=True
+        )
         import rpyc  # noqa: F401
 
 
