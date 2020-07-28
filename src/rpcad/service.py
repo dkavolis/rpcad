@@ -5,7 +5,7 @@
 @Date:                 05-Jun-2020
 @Filename:             service.py
 @Last Modified By:     Daumantas Kavolis
-@Last Modified Time:   14-Jul-2020
+@Last Modified Time:   28-Jul-2020
 """
 
 import logging
@@ -137,9 +137,6 @@ class CADService(rpyc.Service):
 
     def exposed_set_parameters(self, parameters: Dict[str, Union[str, float]]) -> None:
         for name, expression in parameters.items():
-            # for weird reasons dict key is Tuple[str]...
-            if isinstance(name, tuple) and len(name) == 1:
-                name = name[0]
             self._set_parameter(name, expression)
 
     def exposed_undo(self, count: int = 1) -> None:
