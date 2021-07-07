@@ -50,10 +50,13 @@ from rpcad.common import (  # noqa: E402
     RPCAD_LOGDIR,
     RPCAD_LOGLEVEL,
 )
+from rpcad.async_client import AsyncResult, AsyncClient  # noqa: E402
 from rpcad.commands import Command, PhysicalProperty, Accuracy  # noqa: E402
 
 __all__ = [
     "Accuracy",
+    "AsyncClient",
+    "AsyncResult",
     "Client",
     "Command",
     "Parameter",
