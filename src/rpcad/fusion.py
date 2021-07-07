@@ -135,70 +135,79 @@ class EventInfo:
 _FUSION_EVENTS: List[EventInfo] = []
 
 
+def dispatcher(function: Callable, id: str):
+    @wraps(function)
+    def wrapper(*args, callback: Callable[[Any], Any] = None, **kwargs):
+        # setup future for the dispatched method
+        # unknown result type at this time
+        future = FusionFuture(*args, callback=None, **kwargs)  # type: ignore
+
+        # add future to dict making sure it doesn't overwrite any existing ones
+        with _FUTURES_LOCK:
+            index = 0
+            while True:
+                key = f"{id}#{index}"
+                if key in _FUTURES:
+                    index += 1
+                    continue
+
+                _FUTURES[key] = future
+                break
+
+        # add a callback wrapper to delete the reference when the
+        # dispatched function completes
+        def handler(result_or_exception) -> None:
+            if callback is not None:
+                callback(result_or_exception)
+            with _FUTURES_LOCK:
+                _FUTURES.pop(key, None)
+
+        future.callback = handler
+        app: adsk.core.Application = adsk.core.Application.get()  # type: ignore
+        logger.debug("Sending custom event %s", key)
+        app.fireCustomEvent(id, key)
+
+        # no callback provided, block until result is available
+        if callback is None:
+            return future.get_result()
+
+        # callback was provided, return without waiting
+
+    # store some info in the wrapper
+    setattr(wrapper, "unwrapped", property(lambda _: function))
+    setattr(wrapper, "event_id", property(lambda _: id))
+
+    return wrapper
+
+
 class Fusion360ServiceMeta(type):
     def __new__(cls, name, bases, attrs):
         id_prefix = f"rpcad.{name}."
+        exposed_prefix = "exposed_"
+
+        def make_event(name, function):
+            # since attribute names are unique in python they can be used
+            # as unique event ids
+            if name.startswith(exposed_prefix):
+                name = name[len(exposed_prefix) :]  # noqa: E203
+
+            id = f"{id_prefix}{name}"
+
+            _FUSION_EVENTS.append(EventInfo(id, function))
+
+            # replace the original method with dispatcher
+            attrs[name] = dispatcher(function, id)
+
         # https://stackoverflow.com/a/3468410/13262469
         attr_name: str
-        for attr_name, attr_value in attrs.iteritems():
+        for attr_name, attr_value in attrs.items():
             # only wrap the exposed functions
             if isinstance(attr_value, types.FunctionType) and (
                 attr_name.startswith("exposed_") or attr_name == "on_connect"
             ):
-                # since attribute names are unique in python they can be used
-                # as unique event ids
-                id = f"{id_prefix}{attr_name.removeprefix('exposed_')}"
-
-                _FUSION_EVENTS.append(EventInfo(id, attr_value))
-
-                # replace the original method with dispatcher
-                attrs[attr_name] = cls.dispatch(attr_value, id)
+                make_event(attr_name, attr_value)
 
         return super().__new__(cls, name, bases, attrs)
-
-    @staticmethod
-    def dispatch(function: Callable, id: str):
-        @wraps(function)
-        def wrapper(*args, callback: Callable[[Any], Any] = None, **kwargs):
-            # setup future for the dispatched method
-            # unknown result type at this time
-            future = FusionFuture(*args, callback=None, **kwargs)  # type: ignore
-
-            # add future to dict making sure it doesn't overwrite any existing ones
-            with _FUTURES_LOCK:
-                index = 0
-                while True:
-                    key = f"{id}#{index}"
-                    if key in _FUTURES:
-                        index += 1
-                        continue
-
-                    _FUTURES[key] = future
-                    break
-
-            # add a callback wrapper to delete the reference when the
-            # dispatched function completes
-            def handler(result_or_exception) -> None:
-                if callback is not None:
-                    callback(result_or_exception)
-                with _FUTURES_LOCK:
-                    _FUTURES.pop(key, None)
-
-            future.callback = handler
-            app: adsk.core.Application = adsk.core.Application.get()  # type: ignore
-            app.fireCustomEvent(id, key)
-
-            # no callback provided, block until result is available
-            if callback is None:
-                return future.get_result()
-
-            # callback was provided, return without waiting
-
-        # store some info in the wrapper
-        setattr(wrapper, "unwrapped", property(lambda _: function))
-        setattr(wrapper, "event_id", property(lambda _: id))
-
-        return wrapper
 
 
 def register_events() -> Dict[str, Tuple[adsk.core.CustomEvent, DispatchHandler]]:
