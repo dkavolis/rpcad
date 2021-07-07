@@ -79,11 +79,11 @@ class CADService(rpyc.Service):
 
     # abstract methods to be implemented by specific service
     @abstractmethod
-    def _get_parameter(self, name: str) -> Parameter:
+    def _parameter(self, name: str) -> Parameter:
         pass
 
     @abstractmethod
-    def _get_all_parameters(self) -> Dict[str, Parameter]:
+    def _parameters(self) -> Dict[str, Parameter]:
         pass
 
     @abstractmethod
@@ -103,10 +103,6 @@ class CADService(rpyc.Service):
         pass
 
     @abstractmethod
-    def _set_parameter(self, name: str, parameter: Union[str, float]) -> None:
-        pass
-
-    @abstractmethod
     def _undo(self, count: int) -> None:
         pass
 
@@ -119,6 +115,10 @@ class CADService(rpyc.Service):
         pass
 
     @abstractmethod
+    def _set_parameters(self, parameters: Dict[str, Union[str, float]]) -> None:
+        pass
+
+    @abstractmethod
     def _physical_properties(
         self, properties: Iterable[PhysicalProperty], part: str, accuracy: Accuracy
     ) -> Dict[PhysicalProperty, Any]:
@@ -126,10 +126,10 @@ class CADService(rpyc.Service):
 
     # expose service methods
     def exposed_parameter(self, name: str) -> Parameter:
-        return self._get_parameter(name)
+        return self._parameter(name)
 
     def exposed_parameters(self) -> Dict[str, Parameter]:
-        return self._get_all_parameters()
+        return self._parameters()
 
     def exposed_open_project(self, path: str) -> None:
         self._open_project(path)
@@ -143,12 +143,8 @@ class CADService(rpyc.Service):
     def exposed_export_project(self, path: str, *args, **kwargs) -> None:
         self._export_project(path, *args, **kwargs)
 
-    def exposed_set_parameter(self, name: str, expression: Union[str, float]) -> None:
-        self._set_parameter(name, expression)
-
-    def exposed_set_parameters(self, parameters: Dict[str, Union[str, float]]) -> None:
-        for name, expression in parameters.items():
-            self._set_parameter(name, expression)
+    def exposed_set_parameters(self, **kwargs: Union[str, float]) -> None:
+        self._set_parameters(kwargs)
 
     def exposed_undo(self, count: int = 1) -> None:
         self._undo(count)
