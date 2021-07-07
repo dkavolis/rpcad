@@ -2,9 +2,14 @@
 Changelog
 =========
 
+Version 0.2
+
+- Basic async client
+- Export design physical properties
+- Fusion360 server now runs in a worker thread
+- Expose a function to batch commands that preserves the call order
+
 Version 0.1
 ===========
 
-- Feature A added
-- FIX: nasty bug #1729 fixed
-- add your changes here!
+- Initial commit with basic support for Fusion360
