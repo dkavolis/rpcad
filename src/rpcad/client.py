@@ -5,65 +5,64 @@
 @Date:                 06-Jun-2020
 @Filename:             client.py
 @Last Modified By:     Daumantas Kavolis
-@Last Modified Time:   14-Jul-2020
+@Last Modified Time:   07-Jul-2021
 """
 
 import os
-from typing import Dict, Union
+from typing import Dict, Union, Any, overload, Iterable, Callable
 
-import rpyc
-from rpcad.common import RPCAD_FALLBACK_PORT, RPCAD_HOSTNAME, RPCAD_PORT
+from rpcad.common import BaseClient
 from rpcad.parameter import Parameter
+from rpcad.commands import Command, PhysicalProperty, Accuracy
+
+from functools import wraps
 
 
-class Client:
-    def __init__(self, hostname: str = RPCAD_HOSTNAME, port: int = RPCAD_PORT):
-        config = {"allow_public_attrs": True}
-        try:
-            self.connection = rpyc.connect(hostname, port, config=config)
-        except:  # noqa: E722
-            self.connection = rpyc.connect(hostname, RPCAD_FALLBACK_PORT, config=config)
+def remote_call(f: Callable):
+    @wraps(f)
+    def wrapper(self: "BaseClient", *args, **kwargs):
+        return getattr(self.connection.root, f.__name__)(*args, **kwargs)
 
-    def __enter__(self) -> "Client":
-        return self
+    return wrapper
 
-    def __exit__(self, type, value, traceback) -> None:
-        self.close()
 
-    def close(self) -> None:
-        self.connection.close()
+class Client(BaseClient):
+    @remote_call
+    def parameter(self, name: str) -> Parameter:  # type: ignore
+        pass
 
-    def parameter(self, name: str) -> Parameter:
-        return self.connection.root.parameter(name)
-
-    def parameters(self) -> Dict[str, Parameter]:
-        return self.connection.root.parameters()
+    @remote_call
+    def parameters(self) -> Dict[str, Parameter]:  # type: ignore
+        pass
 
     def open_project(self, path: str) -> None:
-        return self.connection.root.open_project(os.path.abspath(path))
+        return self.connection.root.open_project(path=os.path.abspath(path))
 
+    @remote_call
     def save_project(self) -> None:
-        return self.connection.root.save_project()
+        pass
 
+    @remote_call
     def close_project(self) -> None:
-        return self.connection.root.close_project()
+        pass
 
     def export_project(self, path: str, *args, **kwargs) -> None:
         return self.connection.root.export_project(
-            os.path.abspath(path), *args, **kwargs
+            path=os.path.abspath(path), *args, **kwargs
         )
 
-    def set_parameter(self, name: str, expression: Union[str, float]) -> None:
-        return self.connection.root.set_parameter(name, expression)
+    @remote_call
+    def set_parameters(self, **kwargs: Union[str, float]) -> None:
+        pass
 
-    def set_parameters(self, parameters: Dict[str, Union[str, float]]) -> None:
-        return self.connection.root.set_parameters(parameters)
-
+    @remote_call
     def undo(self, count: int = 1) -> None:
-        return self.connection.root.undo(count)
+        pass
 
+    @remote_call
     def reload(self) -> None:
-        return self.connection.root.reload()
+        pass
 
+    @remote_call
     def debug(self) -> None:
-        return self.connection.root.debug()
+        pass
