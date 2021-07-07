@@ -66,3 +66,31 @@ class Client(BaseClient):
     @remote_call
     def debug(self) -> None:
         pass
+
+    @overload
+    def physical_properties(
+        self, prop: PhysicalProperty, part: str, accuracy: Accuracy
+    ) -> Any:
+        ...
+
+    @overload
+    def physical_properties(
+        self, prop: Iterable[PhysicalProperty], part: str, accuracy: Accuracy
+    ) -> Dict[PhysicalProperty, Any]:
+        ...
+
+    @remote_call
+    def physical_properties(self, prop, part, accuracy):  # type: ignore
+        pass
+
+    @overload
+    def batch_commands(self, commands: Command) -> Any:
+        ...
+
+    @overload
+    def batch_commands(self, commands: Iterable[Command]) -> list:
+        ...
+
+    @remote_call
+    def batch_commands(self, commands):  # type: ignore
+        pass
