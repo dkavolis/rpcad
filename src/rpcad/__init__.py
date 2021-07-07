@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from pkg_resources import get_distribution, DistributionNotFound
+import types
 
 try:
     # Change here if project is renamed and does not equal the package name
@@ -28,16 +29,27 @@ ensure_rpyc()
 del ensure_rpyc
 
 
-def reload_service_modules(*args):
-    from rpcad import common, parameter, service, commands
+def reload() -> types.ModuleType:
     import importlib
+    import rpcad
+
+    rpcad = importlib.reload(rpcad)
+
+    from rpcad import common, parameter, commands, service
 
     importlib.reload(common)
     importlib.reload(parameter)
     importlib.reload(commands)
     importlib.reload(service)
-    for module in args:
-        importlib.reload(module)
+
+    try:
+        from rpcad import fusion
+
+        fusion = importlib.reload(fusion)
+    except ImportError:
+        pass
+
+    return rpcad
 
 
 # above is setup needed for submodules
