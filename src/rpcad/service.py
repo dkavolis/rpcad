@@ -217,6 +217,8 @@ class CADService(rpyc.Service):
         kwargs["protocol_config"] = {"allow_public_attrs": True}
 
         try:
-            return server(cls, *args, port=port, **kwargs)
+            return server(cls, *args, hostname=hostname, port=port, **kwargs)
         except OSError:
-            return server(cls, *args, port=RPCAD_FALLBACK_PORT, **kwargs)
+            return server(
+                cls, *args, hostname=hostname, port=RPCAD_FALLBACK_PORT, **kwargs
+            )
