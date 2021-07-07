@@ -30,16 +30,25 @@ class PostInstallCommand(install):
         pl = platform.system()
         if pl == "Windows":
             self.install_win()
+        elif pl == "Linux":
+            self.install_linux()
         elif pl == "Darwin":
             self.install_mac()
 
     def install_win(self):
         self.install_fusion360(
             os.path.expandvars("%LocalAppData%/Autodesk/webdeploy/production"),
-            os.path.expandvars("%AppData%/Autodesk/Autodesk Fusion 360/API/Scripts"),
+            os.path.expandvars("%AppData%/Autodesk/Autodesk Fusion 360/API/AddIns"),
         )
 
     def install_mac(self):
+        print(
+            "Fusion360 Mac paths are not implemented, addin not installed",
+            file=sys.stderr,
+        )
+
+    def install_linux(self):
+        # potentially FreeCAD
         pass
 
     def install_fusion360(self, fusion360_dir: str, addin_dir: str) -> None:
