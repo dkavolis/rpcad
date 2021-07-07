@@ -21,7 +21,7 @@ class BaseClient:
     def __init__(
         self, hostname: str = RPCAD_HOSTNAME, port: Union[int, str] = RPCAD_PORT
     ):
-        config = {"allow_public_attrs": True}
+        config = {"allow_public_attrs": True, "allow_safe_attrs": True}
         try:
             self.connection = rpyc.connect(hostname, port, config=config)  # noqa: F821
         except BaseException:

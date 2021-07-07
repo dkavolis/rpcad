@@ -214,7 +214,10 @@ class CADService(rpyc.Service):
         **kwargs,
     ) -> Server:
 
-        kwargs["protocol_config"] = {"allow_public_attrs": True}
+        kwargs["protocol_config"] = {
+            "allow_public_attrs": True,
+            "allow_safe_attrs": True,
+        }
 
         try:
             return server(cls, *args, hostname=hostname, port=port, **kwargs)
