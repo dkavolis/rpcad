@@ -40,5 +40,4 @@ class BaseClient:
 
 
 del os
-del rpyc
 del Client
