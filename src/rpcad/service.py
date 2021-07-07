@@ -116,7 +116,9 @@ class CADService(rpyc.Service):
 
     def exposed_physical_properties(self, prop, part, accuracy):
         if isinstance(prop, PhysicalProperty):
-            return self._physical_properties([prop], part, accuracy)[prop]
+            return self._physical_properties([prop], part, accuracy)[
+                PhysicalProperty(prop.value)
+            ]
 
         return self._physical_properties(prop, part, accuracy)
 

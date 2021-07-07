@@ -336,7 +336,7 @@ _FUSION_PHYSICAL_PROPERTY: Dict[
 
 def fusion_accuracy(accuracy: Accuracy) -> int:
     return _FUSION_ACCURACY.get(
-        accuracy, adsk.fusion.CalculationAccuracy.LowCalculationAccuracy
+        Accuracy(accuracy.value), adsk.fusion.CalculationAccuracy.LowCalculationAccuracy
     )
 
 
@@ -569,6 +569,7 @@ class Fusion360Service(CADService, metaclass=Fusion360ServiceMeta):
         units = self._design.unitsManager  # type: ignore
 
         for prop in properties:
+            prop = PhysicalProperty(prop.value)
             try:
                 value = _FUSION_PHYSICAL_PROPERTY[prop](
                     body, physical_properties, units
