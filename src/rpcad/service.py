@@ -5,13 +5,14 @@
 @Date:                 05-Jun-2020
 @Filename:             service.py
 @Last Modified By:     Daumantas Kavolis
-@Last Modified Time:   28-Jul-2020
+@Last Modified Time:   07-Jul-2021
 """
 
 import logging
 from abc import abstractmethod
 from logging import handlers
-from typing import Dict, Union, Type
+from typing import Dict, Union, Type, Iterable, Any, overload, TYPE_CHECKING
+import inspect
 
 import rpyc
 from rpcad.common import (
@@ -23,6 +24,10 @@ from rpcad.common import (
 )
 from rpcad.parameter import Parameter
 from rpyc.utils.server import Server, ThreadedServer
+from rpcad.commands import Command, PhysicalProperty, Accuracy
+
+if TYPE_CHECKING:
+    from rpyc.core.protocol import Connection
 
 logger = logging.getLogger(__name__)
 
@@ -59,13 +64,13 @@ def finish_service_logger(handler: logging.Handler) -> None:
 
 
 class CADService(rpyc.Service):
-    def on_connect(self, conn):
+    def on_connect(self, conn: "Connection"):
         # code that runs when a connection is created
         # (to init the service, if needed)
         self.handler = setup_service_logger(self.__class__.__name__)
         logger.info("Service starting: %s", self.__class__.__name__)
 
-    def on_disconnect(self, conn):
+    def on_disconnect(self, conn: "Connection"):
         # code that runs after the connection has already closed
         # (to finalize the service, if needed)
         if self.handler is not None:
@@ -113,6 +118,12 @@ class CADService(rpyc.Service):
     def _debug(self) -> None:
         pass
 
+    @abstractmethod
+    def _physical_properties(
+        self, properties: Iterable[PhysicalProperty], part: str, accuracy: Accuracy
+    ) -> Dict[PhysicalProperty, Any]:
+        pass
+
     # expose service methods
     def exposed_parameter(self, name: str) -> Parameter:
         return self._get_parameter(name)
@@ -148,12 +159,114 @@ class CADService(rpyc.Service):
     def exposed_debug(self) -> None:
         self._debug()
 
+    @overload
+    def exposed_physical_properties(
+        self, prop: PhysicalProperty, part: str, accuracy: Accuracy
+    ) -> Any:
+        ...
+
+    @overload
+    def exposed_physical_properties(
+        self, prop: Iterable[PhysicalProperty], part: str, accuracy: Accuracy
+    ) -> Dict[PhysicalProperty, Any]:
+        ...
+
+    def exposed_physical_properties(self, prop, part, accuracy):
+        if isinstance(prop, PhysicalProperty):
+            return self._physical_properties([prop], part, accuracy)[prop]
+
+        return self._physical_properties(prop, part, accuracy)
+
+    def _invoke_static(self, attr, *args, **kwargs):
+        if isinstance(attr, staticmethod):
+            return attr.__get__(type(self))(*args, **kwargs)
+
+        if isinstance(attr, classmethod):
+            return attr.__get__(self)(*args, **kwargs)
+
+        if inspect.isfunction(attr):
+            return attr(self, *args, **kwargs)
+
+        if inspect.ismethod(attr):
+            return attr(*args, **kwargs)
+
+        if isinstance(attr, property):
+            return attr.fget(self)  # type: ignore
+
+        # only possibility is attr is a regular attribute
+        return attr
+
+    def _find_attribute(self, name: str):
+        impl_name = f"_{name}"
+
+        # prefer implementation methods, getattr_static allows checking if
+        # attributes are static and class methods
+        attr = inspect.getattr_static(self, impl_name, None)
+        if attr is not None:
+            return attr
+
+        # unless they don't exist
+        public_name = f"exposed_{name}"
+        attr = inspect.getattr_static(self, public_name, None)
+        if attr is not None:
+            return attr
+
+        attr = getattr(self, impl_name, None)
+        if attr is not None:
+            return attr
+
+        attr = getattr(self, public_name, None)
+        if attr is not None:
+            return attr
+
+        return None
+
+    def _execute_batch(self, commands: Iterable[Command]) -> list:
+        commands = list(commands)
+
+        # first validate that commands exist to avoid any long running code
+        # before the inevitable crash
+        invalid_commands = []
+        resolved = []
+        for command in commands:
+            attr = self._find_attribute(command.name)
+
+            if attr is None:
+                invalid_commands.append(command.name)
+            else:
+                resolved.append(attr)
+
+        if invalid_commands:
+            raise ValueError(f"Found invalid commands: {invalid_commands}")
+
+        results = []
+        for command, function in zip(commands, resolved):
+            results.append(
+                self._invoke_static(function, *command.args, **command.kwargs)
+            )
+
+        return results
+
+    @overload
+    def exposed_batch_commands(self, commands: Command) -> Any:
+        ...
+
+    @overload
+    def exposed_batch_commands(self, commands: Iterable[Command]) -> list:
+        ...
+
+    def exposed_batch_commands(self, commands):
+        if isinstance(commands, Command):
+            return self._execute_batch([commands])[0]
+
+        return self._execute_batch(commands)
+
     @classmethod
     def create_server(
         cls,
         *args,
-        hostname=RPCAD_HOSTNAME,
-        port=RPCAD_PORT,
+        hostname: str = RPCAD_HOSTNAME,
+        port: Union[str, int] = RPCAD_PORT,
         server: Type[Server] = ThreadedServer,
         **kwargs,
     ) -> Server:

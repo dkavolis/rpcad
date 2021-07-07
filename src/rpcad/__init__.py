@@ -29,11 +29,12 @@ del ensure_rpyc
 
 
 def reload_service_modules(*args):
-    from rpcad import common, parameter, service
+    from rpcad import common, parameter, service, commands
     import importlib
 
     importlib.reload(common)
     importlib.reload(parameter)
+    importlib.reload(commands)
     importlib.reload(service)
     for module in args:
         importlib.reload(module)
@@ -49,14 +50,18 @@ from rpcad.common import (  # noqa: E402
     RPCAD_LOGDIR,
     RPCAD_LOGLEVEL,
 )
+from rpcad.commands import Command, PhysicalProperty, Accuracy  # noqa: E402
 
 __all__ = [
+    "Accuracy",
     "Client",
+    "Command",
     "Parameter",
-    "RPCAD_HOSTNAME",
-    "RPCAD_PORT",
+    "PhysicalProperty",
+    "reload_service_modules",
     "RPCAD_FALLBACK_PORT",
+    "RPCAD_HOSTNAME",
     "RPCAD_LOGDIR",
     "RPCAD_LOGLEVEL",
-    "reload_service_modules",
+    "RPCAD_PORT",
 ]
