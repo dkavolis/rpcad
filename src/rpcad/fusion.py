@@ -122,6 +122,9 @@ class DispatchHandler(adsk.core.CustomEventHandler, Generic[T]):  # type: ignore
         except Exception as e:
             future.set_exception(e)
 
+        for handler in logger.handlers:
+            handler.flush()
+
 
 class EventInfo:
     def __init__(self, id: str, handler: Callable):
