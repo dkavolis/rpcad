@@ -5,7 +5,7 @@
 @Date:                 06-Jun-2020
 @Filename:             client.py
 @Last Modified By:     Daumantas Kavolis
-@Last Modified Time:   07-Jul-2021
+@Last Modified Time:   13-Jul-2021
 """
 
 import os
@@ -80,7 +80,7 @@ class Client(BaseClient):
         ...
 
     @remote_call
-    def physical_properties(self, prop, part, accuracy):  # type: ignore
+    def physical_properties(self, prop, part, accuracy=Accuracy.Medium):  # type: ignore
         pass
 
     @overload
