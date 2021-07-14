@@ -5,11 +5,12 @@
 @Date:                 06-Jun-2020
 @Filename:             client.py
 @Last Modified By:     Daumantas Kavolis
-@Last Modified Time:   13-Jul-2021
+@Last Modified Time:   14-Jul-2021
 """
 
 import os
 from typing import Dict, Union, Any, overload, Iterable, Callable
+import inspect
 
 from rpcad.common import BaseClient
 from rpcad.parameter import Parameter
@@ -19,9 +20,15 @@ from functools import wraps
 
 
 def remote_call(f: Callable):
+    signature = inspect.signature(f)
+
     @wraps(f)
     def wrapper(self: "BaseClient", *args, **kwargs):
-        return getattr(self.connection.root, f.__name__)(*args, **kwargs)
+        arguments = signature.bind(self, *args, **kwargs)
+        arguments.apply_defaults()
+        return getattr(self.connection.root, f.__name__)(
+            *arguments.args[1:], **arguments.kwargs
+        )
 
     return wrapper
 
