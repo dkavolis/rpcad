@@ -5,7 +5,7 @@
 @Date:                 06-Jun-2020
 @Filename:             client.py
 @Last Modified By:     Daumantas Kavolis
-@Last Modified Time:   21-Jul-2021
+@Last Modified Time:   22-Jul-2021
 """
 
 import os
@@ -38,7 +38,7 @@ def remote_call(f: Callable):
             # name may be one of the kwargs so set args and kwargs outside the
             # constructor
             command = Command(name=f.__name__)
-            command.args = arguments.args
+            command.args = arguments.args[1:]
             command.kwargs = arguments.kwargs
             return command
 
