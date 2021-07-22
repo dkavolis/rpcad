@@ -5,12 +5,13 @@
 @Date:                 05-Jun-2020
 @Filename:             service.py
 @Last Modified By:     Daumantas Kavolis
-@Last Modified Time:   07-Jul-2021
+@Last Modified Time:   22-Jul-2021
 """
 
 from abc import abstractmethod
 from typing import Dict, Union, Type, Iterable, Any, overload
 import inspect
+import logging
 
 import rpyc
 from rpcad.common import (
@@ -21,6 +22,8 @@ from rpcad.common import (
 from rpcad.parameter import Parameter
 from rpyc.utils.server import Server, ThreadedServer
 from rpcad.commands import Command, PhysicalProperty, Accuracy
+
+logger = logging.getLogger(__name__)
 
 
 class CADService(rpyc.Service):
@@ -123,20 +126,30 @@ class CADService(rpyc.Service):
         return self._physical_properties(prop, part, accuracy)
 
     def _invoke_static(self, attr, *args, **kwargs):
-        if isinstance(attr, staticmethod):
-            return attr.__get__(type(self))(*args, **kwargs)
+        try:
+            if isinstance(attr, staticmethod):
+                return attr.__get__(type(self))(*args, **kwargs)
 
-        if isinstance(attr, classmethod):
-            return attr.__get__(self)(*args, **kwargs)
+            if isinstance(attr, classmethod):
+                return attr.__get__(self)(*args, **kwargs)
 
-        if inspect.isfunction(attr):
-            return attr(self, *args, **kwargs)
+            if inspect.isfunction(attr):
+                return attr(self, *args, **kwargs)
 
-        if inspect.ismethod(attr):
-            return attr(*args, **kwargs)
+            if inspect.ismethod(attr):
+                return attr(*args, **kwargs)
 
-        if isinstance(attr, property):
-            return attr.fget(self)  # type: ignore
+            if isinstance(attr, property):
+                return attr.fget(self)  # type: ignore
+        except Exception:
+            logger.error(
+                "Error _invoke_static(self=%s, attr=%s, *args=%s, **kwargs=%s)",
+                self,
+                attr,
+                args,
+                kwargs,
+            )
+            raise
 
         # only possibility is attr is a regular attribute
         return attr
@@ -167,6 +180,16 @@ class CADService(rpyc.Service):
 
         if invalid_commands:
             raise ValueError(f"Found invalid commands: {invalid_commands}")
+
+        logger.debug("Batch commands received:")
+        for command, function in zip(commands, resolved):
+            logger.debug(
+                "  %s %r (args=%s, kwargs=%s)",
+                command.name,
+                function,
+                command.args,
+                command.kwargs,
+            )
 
         results = []
         for command, function in zip(commands, resolved):
