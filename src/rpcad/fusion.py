@@ -5,7 +5,7 @@
 @Date:                 05-Jun-2020
 @Filename:             fusion.py
 @Last Modified By:     Daumantas Kavolis
-@Last Modified Time:   07-Jul-2021
+@Last Modified Time:   22-Jul-2021
 """
 
 import logging
@@ -100,30 +100,37 @@ _FUTURES_LOCK = Lock()  # lock for modifying futures dictionary
 
 # stubs missing handler type
 class DispatchHandler(adsk.core.CustomEventHandler, Generic[T]):  # type: ignore
+    _IN_MAIN_THREAD = False
+
     def __init__(self, handler: Callable[..., T]):
         super().__init__()
         self._handler = handler
 
     def notify(self, args: adsk.core.CustomEventArgs) -> None:
-        # static method stub has useless self argument
-        app: adsk.core.Application = adsk.core.Application.get()  # type: ignore
-        ui = app.userInterface
-
-        # Make sure a command isn't running before changes are made.
-        if ui is not None and ui.activeCommand != "SelectCommand":
-            # stubs are wrong
-            ui.commandDefinitions.itemById("SelectCommand").execute()  # type: ignore
-
-        future: FusionFuture[T] = _FUTURES[args.additionalInfo]
+        _IN_MAIN_THREAD = True
 
         try:
-            result = self._handler(*future.args, **future.kwargs)
-            future.set_result(result)
-        except Exception as e:
-            future.set_exception(e)
+            # static method stub has useless self argument
+            app: adsk.core.Application = adsk.core.Application.get()  # type: ignore
+            ui = app.userInterface
 
-        for handler in logger.handlers:
-            handler.flush()
+            # Make sure a command isn't running before changes are made.
+            if ui is not None and ui.activeCommand != "SelectCommand":
+                # stubs are wrong
+                ui.commandDefinitions.itemById("SelectCommand").execute()  # type: ignore
+
+            future: FusionFuture[T] = _FUTURES[args.additionalInfo]
+
+            try:
+                result = self._handler(*future.args, **future.kwargs)
+                future.set_result(result)
+            except Exception as e:
+                future.set_exception(e)
+
+            for handler in logger.handlers:
+                handler.flush()
+        finally:
+            _IN_MAIN_THREAD = False
 
 
 class EventInfo:
@@ -138,6 +145,19 @@ _FUSION_EVENTS: List[EventInfo] = []
 def dispatcher(function: Callable, id: str):
     @wraps(function)
     def wrapper(*args, callback: Callable[[Any], Any] = None, **kwargs):
+        # skip custom events if already in main thread
+        if DispatchHandler._IN_MAIN_THREAD:
+            try:
+                result = function(*args, **kwargs)
+                if callback is not None:
+                    callback(result)
+
+                return result
+            except Exception as e:
+                if callback is not None:
+                    callback(e)
+                raise e
+
         # setup future for the dispatched method
         # unknown result type at this time
         future = FusionFuture(*args, callback=None, **kwargs)  # type: ignore
