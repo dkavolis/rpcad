@@ -142,29 +142,13 @@ class CADService(rpyc.Service):
         return attr
 
     def _find_attribute(self, name: str):
-        impl_name = f"_{name}"
+        exposed = f"exposed_{name}"
 
-        # prefer implementation methods, getattr_static allows checking if
-        # attributes are static and class methods
-        attr = inspect.getattr_static(self, impl_name, None)
+        attr = inspect.getattr_static(self, exposed, None)
         if attr is not None:
             return attr
 
-        # unless they don't exist
-        public_name = f"exposed_{name}"
-        attr = inspect.getattr_static(self, public_name, None)
-        if attr is not None:
-            return attr
-
-        attr = getattr(self, impl_name, None)
-        if attr is not None:
-            return attr
-
-        attr = getattr(self, public_name, None)
-        if attr is not None:
-            return attr
-
-        return None
+        return getattr(self, exposed, None)
 
     def _execute_batch(self, commands: Iterable[Command]) -> list:
         commands = list(commands)
