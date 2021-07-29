@@ -60,7 +60,6 @@ class PostInstallCommand(install):
 
         rpyc_version = rpyc.version.version_string  # type: ignore
 
-        source_dir = Path(__file__).absolute().parent
         print("-- Looking for python executables in ", fusion360_dir)
         pydir: Optional[Path] = None
         for python_exe in glob.glob(f"{fusion360_dir}/**/Python/[Pp]ython*"):
@@ -85,26 +84,30 @@ class PostInstallCommand(install):
             )
             pydir = python_dir
 
-        dst = addin_dir / "RPC Server"
+        self.install_fusion360_addin("RPC Server", pydir, addin_dir)
+        self.install_fusion360_addin("RPC Server Oneshot", pydir, addin_dir)
+
+    def install_fusion360_addin(
+        self, name: str, python_dir: Optional[Path], addin_dir: Path
+    ) -> None:
+        source_dir = Path(__file__).absolute().parent
+        dst = addin_dir / name
         if os.path.exists(dst):
             shutil.rmtree(dst)
 
-        print(f"-- Copying addin to {addin_dir}")
+        print(f"-- Copying addin to '{addin_dir}'")
         addin = shutil.copytree(
-            source_dir / "addins" / "fusion360" / "RPC Server",
-            addin_dir / "RPC Server",
+            source_dir / "addins" / "fusion360" / name,
+            addin_dir / name,
         )
         shutil.copytree(source_dir / "src" / "rpcad", addin / "rpcad")
 
-        if pydir is None:
+        if python_dir is None:
             return
 
+        pypath = python_dir.parent / "Api" / "Python" / "packages"
         with open(addin / ".env", "w") as file:
-            file.write(
-                f'PYTHONPATH={pydir.parent / "Api" / "Python" / "packages"}'.replace(
-                    "\\", "/"
-                )
-            )
+            file.write(f"PYTHONPATH={pypath}".replace("\\", "/"))
 
 
 try:

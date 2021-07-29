@@ -1,0 +1,12 @@
+{
+	"autodeskProduct":	"Fusion360",
+	"type":	"addin",
+	"id":	"6cb19a0e-bcb3-4ed7-b4f3-08b038ace8d1",
+	"author":	"D. Kavolis",
+	"description":	{
+		"":	"RPC server for modifying parametric designs for optimization. Blocks until the connection is made and closed."
+	},
+	"version":	"0.2",
+	"supportedOS":	"windows|mac",
+	"editEnabled":	true
+}
