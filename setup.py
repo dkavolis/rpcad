@@ -16,6 +16,7 @@ import os
 from subprocess import check_call
 import shutil
 from pathlib import Path
+from typing import Optional
 
 from pkg_resources import VersionConflict, require
 from setuptools import setup
@@ -61,6 +62,7 @@ class PostInstallCommand(install):
 
         source_dir = Path(__file__).absolute().parent
         print("-- Looking for python executables in ", fusion360_dir)
+        pydir: Optional[Path] = None
         for python_exe in glob.glob(f"{fusion360_dir}/**/Python/[Pp]ython*"):
             executable = Path(python_exe)
             python_dir = executable.parent
@@ -81,6 +83,7 @@ class PostInstallCommand(install):
                 ],
                 cwd=python_dir,
             )
+            pydir = python_dir
 
         dst = addin_dir / "RPC Server"
         if os.path.exists(dst):
@@ -92,6 +95,16 @@ class PostInstallCommand(install):
             addin_dir / "RPC Server",
         )
         shutil.copytree(source_dir / "src" / "rpcad", addin / "rpcad")
+
+        if pydir is None:
+            return
+
+        with open(addin / ".env", "w") as file:
+            file.write(
+                f'PYTHONPATH={pydir.parent / "Api" / "Python" / "packages"}'.replace(
+                    "\\", "/"
+                )
+            )
 
 
 try:
