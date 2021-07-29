@@ -5,7 +5,7 @@
 @Date:                 05-Jun-2020
 @Filename:             fusion.py
 @Last Modified By:     Daumantas Kavolis
-@Last Modified Time:   22-Jul-2021
+@Last Modified Time:   29-Jul-2021
 """
 
 import logging
@@ -360,7 +360,7 @@ def fusion_accuracy(accuracy: Accuracy) -> int:
     )
 
 
-class Fusion360Service(CADService, metaclass=Fusion360ServiceMeta):
+class Fusion360Service(CADService):
     def _setup(self) -> None:
         # setup fusion 360 objects
         self._app: adsk.core.Application = adsk.core.Application.get()  # type: ignore
@@ -600,6 +600,10 @@ class Fusion360Service(CADService, metaclass=Fusion360ServiceMeta):
             values[prop] = value
 
         return values
+
+
+def Fusion360ServiceThreaded(Fusion360Service, metaclass=Fusion360ServiceMeta):
+    pass
 
 
 def cast_parameter(parameter: adsk.fusion.Parameter) -> Parameter:

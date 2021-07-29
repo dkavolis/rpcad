@@ -36,7 +36,7 @@ handler = handlers.RotatingFileHandler(
 
 def start_service():
     from rpcad import RPCAD_LOGLEVEL
-    from rpcad.fusion import Fusion360Service
+    from rpcad.fusion import Fusion360ServiceThreaded
     from rpyc.utils.server import ThreadPoolServer
 
     global SERVER
@@ -45,7 +45,7 @@ def start_service():
     # complete, especially when they have to use events to communicate and wait
     # for the main thread to finish
     try:
-        SERVER = Fusion360Service.create_server(
+        SERVER = Fusion360ServiceThreaded.create_server(
             server=ThreadPoolServer, requestBatchSize=1
         )
         SERVER.logger.addHandler(handler)
