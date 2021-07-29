@@ -79,6 +79,9 @@ def run(context):
     finally:
         handler.flush()
 
+        # oneshot so there's no reason to keep this script continuing
+        adsk.terminate()
+
 
 def stop(context):
     ui = None

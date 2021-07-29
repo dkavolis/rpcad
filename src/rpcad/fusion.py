@@ -602,7 +602,7 @@ class Fusion360Service(CADService):
         return values
 
 
-def Fusion360ServiceThreaded(Fusion360Service, metaclass=Fusion360ServiceMeta):
+class Fusion360ServiceThreaded(Fusion360Service, metaclass=Fusion360ServiceMeta):
     pass
 
 
