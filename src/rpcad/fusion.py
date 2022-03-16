@@ -1,17 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding:utf-8 -*-
-"""
-@Author:               Daumantas Kavolis <dkavolis>
-@Date:                 05-Jun-2020
-@Filename:             fusion.py
-@Last Modified By:     Daumantas Kavolis
-@Last Modified Time:   29-Jul-2021
-"""
+
+from __future__ import annotations
 
 import logging
 import os
+import pathlib
 from typing import (
-    Dict,
+    TYPE_CHECKING,
     Iterable,
     Optional,
     Tuple,
@@ -20,28 +16,45 @@ from typing import (
     TypeVar,
     Callable,
     Any,
+    overload,
+    Dict,
     List,
 )
+from abc import abstractmethod
+import traceback
+from logging import handlers
+from threading import Event, Lock
+from functools import wraps
+import types
+from rpyc.utils.server import Server
 
 from rpcad.parameter import Parameter
 from rpcad.service import CADService
 from rpcad.commands import PhysicalProperty, Accuracy
-from threading import Event, Lock
-from functools import wraps
-import types
-
+import adsk.cam
 import adsk.core
 import adsk.fusion
+import adsk
+
+
+if TYPE_CHECKING:
+    from typing_extensions import Concatenate, ParamSpec, Literal
+    from rpyc import Connection
+
+    P = ParamSpec("P")
+
+T = TypeVar("T")
+R = TypeVar("R")
 
 logger = logging.getLogger(__name__)
 
 
-T = TypeVar("T")
-
-
 class FusionFuture(Generic[T]):
     def __init__(
-        self, *args, callback: Callable[[Union[T, Exception]], Any] = None, **kwargs
+        self,
+        *args: Any,
+        callback: Optional[Callable[[Union[T, Exception]], None]] = None,
+        **kwargs: Any,
     ):
         self._result: Optional[T] = None
         self._exception: Optional[Exception] = None
@@ -66,7 +79,7 @@ class FusionFuture(Generic[T]):
         if self.callback is not None:
             self.callback(exception)
 
-    def wait(self, timeout: float = None) -> bool:
+    def wait(self, timeout: Optional[float] = None) -> bool:
         return self._event.wait(timeout)
 
     @property
@@ -81,7 +94,7 @@ class FusionFuture(Generic[T]):
     def completed(self) -> bool:
         return self._event.is_set()
 
-    def get_result(self, timeout: float = None) -> T:
+    def get_result(self, timeout: Optional[float] = None) -> T:
         finished = self._event.wait(timeout)
         if not finished:
             raise TimeoutError("Timed out while waiting for result")
@@ -94,73 +107,78 @@ class FusionFuture(Generic[T]):
 
 """Dictionary for passing arguments and synchronization from the server to
 event handlers since only strings can be passed as additional arguments"""
-_FUTURES: Dict[str, FusionFuture] = {}
+_FUTURES: Dict[str, FusionFuture[Any]] = {}
 _FUTURES_LOCK = Lock()  # lock for modifying futures dictionary
 
 
 # stubs missing handler type
 class DispatchHandler(adsk.core.CustomEventHandler, Generic[T]):  # type: ignore
-    _IN_MAIN_THREAD = False
-
     def __init__(self, handler: Callable[..., T]):
         super().__init__()
         self._handler = handler
 
-    def notify(self, args: adsk.core.CustomEventArgs) -> None:
-        _IN_MAIN_THREAD = True
+    def notify(self, eventArgs: adsk.core.CustomEventArgs) -> None:
+        # static method stub has useless self argument
+        app: adsk.core.Application = adsk.core.Application.get()  # type: ignore
+        ui = app.userInterface
+
+        # Make sure a command isn't running before changes are made.
+        if ui is not None and ui.activeCommand != "SelectCommand":
+            # stubs are wrong
+            ui.commandDefinitions.itemById("SelectCommand").execute()  # type: ignore
+
+        future: FusionFuture[T] = _FUTURES[eventArgs.additionalInfo]
 
         try:
-            # static method stub has useless self argument
-            app: adsk.core.Application = adsk.core.Application.get()  # type: ignore
-            ui = app.userInterface
+            result = self._handler(*future.args, **future.kwargs)
+            future.set_result(result)
+        except Exception as e:
+            future.set_exception(e)
 
-            # Make sure a command isn't running before changes are made.
-            if ui is not None and ui.activeCommand != "SelectCommand":
-                # stubs are wrong
-                ui.commandDefinitions.itemById("SelectCommand").execute()  # type: ignore
-
-            future: FusionFuture[T] = _FUTURES[args.additionalInfo]
-
-            try:
-                result = self._handler(*future.args, **future.kwargs)
-                future.set_result(result)
-            except Exception as e:
-                future.set_exception(e)
-
-            for handler in logger.handlers:
-                handler.flush()
-        finally:
-            _IN_MAIN_THREAD = False
+        for handler in logger.handlers:
+            handler.flush()
 
 
-class EventInfo:
-    def __init__(self, id: str, handler: Callable):
+class EventInfo(Generic[T]):
+    def __init__(self, id: str, handler: Callable[..., T]):
         self.id = id
         self.handler = handler
 
 
-_FUSION_EVENTS: List[EventInfo] = []
+_FUSION_EVENTS: List[EventInfo[Any]] = []
 
 
-def dispatcher(function: Callable, id: str):
+def dispatcher(
+    function: Callable[P, R], id: str
+) -> Callable[  # type: ignore
+    Concatenate[P, Optional[Callable[[Union[R, Exception]], None]]],  # type: ignore
+    None,
+]:
+    @overload
+    def wrapper(
+        *args: P.args,  # type: ignore
+        callback: Literal[None] = ...,  # type: ignore
+        **kwargs: P.kwargs,  # type: ignore
+    ) -> R:
+        ...
+
+    @overload
+    def wrapper(
+        *args: P.args,  # type: ignore
+        callback: Callable[[Union[R, Exception]], None] = ...,  # type: ignore
+        **kwargs: P.kwargs,  # type: ignore
+    ) -> None:
+        ...
+
     @wraps(function)
-    def wrapper(*args, callback: Callable[[Any], Any] = None, **kwargs):
-        # skip custom events if already in main thread
-        if DispatchHandler._IN_MAIN_THREAD:
-            try:
-                result = function(*args, **kwargs)
-                if callback is not None:
-                    callback(result)
-
-                return result
-            except Exception as e:
-                if callback is not None:
-                    callback(e)
-                raise e
-
+    def wrapper(
+        *args: P.args,  # type: ignore
+        callback: Optional[Callable[[Union[R, Exception]], None]] = None,  # type:ignore
+        **kwargs: P.kwargs,  # type: ignore
+    ) -> Optional[R]:
         # setup future for the dispatched method
         # unknown result type at this time
-        future = FusionFuture(*args, callback=None, **kwargs)  # type: ignore
+        future: FusionFuture[R] = FusionFuture(*args, callback=None, **kwargs)
 
         # add future to dict making sure it doesn't overwrite any existing ones
         with _FUTURES_LOCK:
@@ -176,7 +194,7 @@ def dispatcher(function: Callable, id: str):
 
         # add a callback wrapper to delete the reference when the
         # dispatched function completes
-        def handler(result_or_exception) -> None:
+        def handler(result_or_exception: Union[R, Exception]) -> None:
             if callback is not None:
                 callback(result_or_exception)
             with _FUTURES_LOCK:
@@ -187,11 +205,12 @@ def dispatcher(function: Callable, id: str):
         logger.debug("Sending custom event %s", key)
         app.fireCustomEvent(id, key)
 
-        # no callback provided, block until result is available
+        # no callback provided, block until result is available to mimic the behaviour
+        # of blocking service
         if callback is None:
             return future.get_result()
 
-        # callback was provided, return without waiting
+        return None
 
     # store some info in the wrapper
     setattr(wrapper, "unwrapped", property(lambda _: function))
@@ -200,16 +219,18 @@ def dispatcher(function: Callable, id: str):
     return wrapper
 
 
-class Fusion360ServiceMeta(type):
-    def __new__(cls, name, bases, attrs):
-        id_prefix = f"rpcad.{name}."
-        exposed_prefix = "exposed_"
+EXPOSED_PREFIX = "exposed_"
 
-        def make_event(name, function):
+
+class Fusion360ServiceMeta(type):
+    def __new__(cls, name: str, bases: tuple[Any, ...], attrs: Dict[str, Any]):
+        id_prefix = f"rpcad.{name}."
+
+        def make_event(name: str, function: Callable[..., Any]) -> None:
             # since attribute names are unique in python they can be used
             # as unique event ids
-            if name.startswith(exposed_prefix):
-                name = name[len(exposed_prefix) :]  # noqa: E203
+            if name.startswith(EXPOSED_PREFIX):
+                name = name[len(EXPOSED_PREFIX) :]  # noqa: E203
 
             id = f"{id_prefix}{name}"
 
@@ -230,10 +251,10 @@ class Fusion360ServiceMeta(type):
         return super().__new__(cls, name, bases, attrs)
 
 
-def register_events() -> Dict[str, Tuple[adsk.core.CustomEvent, DispatchHandler]]:
+def register_events() -> Dict[str, Tuple[adsk.core.CustomEvent, DispatchHandler[Any]]]:
     app: adsk.core.Application = adsk.core.Application.get()  # type: ignore
 
-    events = {}
+    events: Dict[str, Tuple[adsk.core.CustomEvent, DispatchHandler[Any]]] = {}
     for event_info in _FUSION_EVENTS:
         # setup fusion 360 event and attach a corresponding handler
         # using the original function
@@ -260,10 +281,12 @@ def unregister_events(
         event.remove(handler)
 
 
-def ensure_valid_document(f):
+def ensure_valid_document(
+    f: Callable[Concatenate["Fusion360Service", P], R]  # type: ignore
+) -> Callable[Concatenate["Fusion360Service", P], R]:  # type: ignore
     @wraps(f)
-    def wrapper(self: "Fusion360Service", *args, **kwargs):
-        self._validate_design()
+    def wrapper(self: "Fusion360Service", *args: P.args, **kwargs: P.kwargs) -> R:
+        self._validate_design()  # type: ignore # protected access
         return f(self, *args, **kwargs)
 
     return wrapper
@@ -384,11 +407,11 @@ class Fusion360Service(CADService):
         if self._design is None:
             raise RuntimeError("No open designs")
 
-    def on_connect(self, conn):
+    def on_connect(self, conn: "Connection"):
         super().on_connect(conn)
         self._setup()
 
-    def on_disconnect(self, conn):
+    def on_disconnect(self, conn: "Connection"):
         super().on_disconnect(conn)
 
         # no connections so doesn't matter that it's None, will be valid on
@@ -404,7 +427,7 @@ class Fusion360Service(CADService):
 
     @ensure_valid_document
     def _parameters(self) -> Dict[str, Parameter]:
-        items = {}
+        items: Dict[str, Parameter] = {}
 
         parameters = self._design.allParameters  # type: ignore
         for i in range(parameters.count):
@@ -486,7 +509,7 @@ class Fusion360Service(CADService):
         return None
 
     @ensure_valid_document
-    def _export_project(self, path: str, *args, **kwargs) -> None:
+    def _export_project(self, path: str, *args: Any, **kwargs: Any) -> None:
         """
         Use kwargs to pass additional export values
 
@@ -508,6 +531,9 @@ class Fusion360Service(CADService):
         if extension == ".stl":
             if body_name is not None:
                 body = self._select_by_name(body_name)
+
+                if body is None:
+                    raise ValueError(f"Body {body_name!r} not found")
 
             options = export_manager.createSTLExportOptions(body, path)
         else:
@@ -584,8 +610,10 @@ class Fusion360Service(CADService):
         if body is None:
             raise ValueError(f"Could not find component or brep body {part}")
 
-        physical_properties = body.getPhysicalProperties(fusion_accuracy(accuracy))
-        values = {}
+        physical_properties = body.getPhysicalProperties(
+            fusion_accuracy(accuracy)  # type: ignore # stubs are wrong
+        )
+        values: Dict[PhysicalProperty, Any] = {}
         units = self._design.unitsManager  # type: ignore
 
         for prop in properties:
@@ -608,3 +636,116 @@ class Fusion360ServiceThreaded(Fusion360Service, metaclass=Fusion360ServiceMeta)
 
 def cast_parameter(parameter: adsk.fusion.Parameter) -> Parameter:
     return Parameter(value=parameter.value, expression=parameter.expression)
+
+
+class BasicFusionAddin:
+    def __init__(self, log_dir: pathlib.Path):
+        self.server: Optional[Server] = None
+        self.logger = logging.getLogger("rpcad.Fusion360.AddIn")
+        self.handler = handlers.RotatingFileHandler(
+            f"{log_dir}/service.log",
+            mode="a+",
+            backupCount=5,
+            delay=False,
+            maxBytes=1024 * 1024,
+        )
+
+    def run(self, context: Any) -> None:
+        ui = None
+        try:
+            app: adsk.core.Application = adsk.core.Application.get()  # type: ignore
+            ui = app.userInterface
+
+            import rpcad
+
+            rpcad = rpcad.reload()
+
+            formatter = logging.Formatter(
+                "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+            )
+            self.handler.setFormatter(formatter)
+
+            root_logger = logging.getLogger(rpcad.__name__)
+            root_logger.addHandler(self.handler)
+            root_logger.setLevel(rpcad.RPCAD_LOGLEVEL)
+            self.handler.setLevel(rpcad.RPCAD_LOGLEVEL)
+
+            self.logger.info("Starting RPC server addin")
+            self.start_service(context)
+
+        except:  # noqa: E722
+            if ui:
+                ui.messageBox(  # type: ignore
+                    "Failed:\n{}".format(traceback.format_exc())
+                )
+        finally:
+            self.handler.flush()
+
+            self._post_run(context)
+
+    def stop(self, context: Any) -> None:
+        ui = None
+        try:
+            app: adsk.core.Application = adsk.core.Application.get()  # type: ignore
+            ui = app.userInterface
+
+            self.stop_service(context)
+
+        except:  # noqa: E722
+            if ui:
+                ui.messageBox(  # type: ignore
+                    "Failed:\n{}".format(traceback.format_exc())
+                )
+        finally:
+            self.handler.flush()
+            self.handler.close()
+            logging.getLogger("rpcad").removeHandler(self.handler)
+
+    def start_service(self, context: Any) -> None:
+        from rpcad import RPCAD_LOGLEVEL
+
+        try:
+            self._create_service(context)
+
+            if self.server is None:
+                return
+            self.server.logger.addHandler(self.handler)
+            self.server.logger.setLevel(RPCAD_LOGLEVEL)
+            self.server.logger.info(
+                "Server created at %s:%s, starting",
+                self.server.host,
+                self.server.port,  # type: ignore
+            )
+
+            self._start_service(context)
+        except Exception:
+            self.logger.exception("RPC Server failed to start")
+            app: adsk.core.Application = adsk.core.Application.get()  # type: ignore
+            ui = app.userInterface
+            if ui:
+                ui.messageBox(  # type: ignore
+                    "Failed to start RPC server:\n{}".format(traceback.format_exc())
+                )
+
+    def stop_service(self, context: Any) -> None:
+        if self.server is not None:
+            self.server.close()
+            self.logger.info("Server closed")
+            self.server.logger.removeHandler(self.handler)
+
+        self._stop_service(context)
+
+    def _start_service(self, context: Any) -> None:
+        if self.server is not None:
+            self.server.start()
+
+    @abstractmethod
+    def _create_service(self, context: Any) -> None:
+        ...
+
+    @abstractmethod
+    def _stop_service(self, context: Any) -> None:
+        ...
+
+    def _post_run(self, context: Any) -> None:
+        pass

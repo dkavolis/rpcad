@@ -2,6 +2,10 @@
 Changelog
 =========
 
+Version 0.3
+
+- Type hints
+
 Version 0.2
 
 - Basic async client

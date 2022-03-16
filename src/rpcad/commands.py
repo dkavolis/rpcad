@@ -1,11 +1,16 @@
 #!/usr/bin/env python3
 # -*- coding:utf-8 -*-
 
+from __future__ import annotations
+
 import enum
+from typing import Any, Generic, TypeVar
+
+T = TypeVar("T")
 
 
-class Command:
-    def __init__(self, name: str, *args, **kwargs):
+class Command(Generic[T]):
+    def __init__(self, name: str, *args: Any, **kwargs: Any):
         self.name = name
         self.args = args
         self.kwargs = kwargs

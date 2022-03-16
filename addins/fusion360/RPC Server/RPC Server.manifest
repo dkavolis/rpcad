@@ -6,7 +6,7 @@
 	"description":	{
 		"":	"RPC server for modifying parametric designs for optimization."
 	},
-	"version":	"0.2",
+	"version":	"0.3",
 	"supportedOS":	"windows|mac",
 	"editEnabled":	true
 }

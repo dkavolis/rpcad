@@ -1,4 +1,8 @@
-# -*- coding: utf-8 -*-
+#!/usr/bin/env python3
+# -*- coding:utf-8 -*-
+
+from __future__ import annotations
+
 from pkg_resources import get_distribution, DistributionNotFound
 import types
 
@@ -12,7 +16,8 @@ finally:
     del get_distribution, DistributionNotFound
 
 
-def ensure_rpyc():
+def ensure_rpyc() -> None:
+    # pyright: reportUnusedImport=false
     try:
         import rpyc
     except (ImportError, ModuleNotFoundError):
@@ -30,6 +35,14 @@ del ensure_rpyc
 
 
 def reload() -> types.ModuleType:
+    """
+    reload reload rpcad module without restarting Python
+
+    Returns
+    -------
+    types.ModuleType
+        reloaded rpcad module
+    """
     import importlib
     import rpcad
 
@@ -73,7 +86,7 @@ __all__ = [
     "Command",
     "Parameter",
     "PhysicalProperty",
-    "reload_service_modules",
+    "reload",
     "RPCAD_FALLBACK_PORT",
     "RPCAD_HOSTNAME",
     "RPCAD_LOGDIR",

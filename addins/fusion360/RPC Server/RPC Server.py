@@ -1,135 +1,79 @@
 # Author-D. Kavolis
 # Description-RPC server for modifying designs.
 
-import os
-import sys
-import traceback
+import pathlib
 from threading import Thread
-from typing import Optional
+from typing import Any, Optional, Tuple, Dict
 import time
-import logging
-from logging import handlers
+import sys
+import os
 
 import adsk.cam
 import adsk.core
-import adsk.fusion
 import adsk
 
-addin_dir = os.path.dirname(os.path.abspath(__file__))
-sys.path.append(addin_dir)
+# the addin directory is not in search path by default
+sys.path.append(os.path.dirname(__file__))
+from rpcad.fusion import BasicFusionAddin, DispatchHandler  # noqa: E402
 
 
-SERVER = None
-PROCESS: Optional[Thread] = None
-EVENTS = None
+class FusionServer(BasicFusionAddin):
+    def __init__(self):
+        super().__init__(pathlib.Path(__file__).parent)
+        self.process: Optional[Thread] = None
+        self.events: Optional[
+            Dict[str, Tuple[adsk.core.CustomEvent, DispatchHandler[Any]]]
+        ] = None
 
+    def _create_service(self, context: Any) -> None:
+        from rpcad.fusion import Fusion360ServiceThreaded
+        from rpyc.utils.server import ThreadPoolServer
 
-logger = logging.getLogger("rpcad.Fusion360.AddIn")
-handler = handlers.RotatingFileHandler(
-    f"{addin_dir}/service.log",
-    mode="a+",
-    backupCount=5,
-    delay=False,
-    maxBytes=1024 * 1024,
-)
-
-
-def start_service():
-    from rpcad import RPCAD_LOGLEVEL
-    from rpcad.fusion import Fusion360ServiceThreaded
-    from rpyc.utils.server import ThreadPoolServer
-
-    global SERVER
-
-    # use requestBatchSize = 1 since most CAD functions can take a while to
-    # complete, especially when they have to use events to communicate and wait
-    # for the main thread to finish
-    try:
-        SERVER = Fusion360ServiceThreaded.create_server(
+        # use requestBatchSize = 1 since most CAD functions can take a while to
+        # complete, especially when they have to use events to communicate and wait
+        # for the main thread to finish
+        self.server = Fusion360ServiceThreaded.create_server(
             server=ThreadPoolServer, requestBatchSize=1
         )
-        SERVER.logger.addHandler(handler)
-        SERVER.logger.setLevel(RPCAD_LOGLEVEL)
-        logger.info("Server created at %s:%s, starting", SERVER.host, SERVER.port)
-        SERVER.start()
-    except Exception:
-        logger.exception("RPC Server failed")
-        app: adsk.core.Application = adsk.core.Application.get()  # type: ignore
-        ui = app.userInterface
-        if ui:
-            ui.messageBox("Failed to start RPC server:\n{}".format(traceback.format_exc()))  # type: ignore
 
-
-def run(context):
-    ui = None
-    try:
-        app: adsk.core.Application = adsk.core.Application.get()  # type: ignore
-        ui = app.userInterface
-
-        import rpcad
-
-        rpcad = rpcad.reload()
+    def _start_service(self, context: Any) -> None:
         from rpcad.fusion import register_events
 
-        formatter = logging.Formatter(
-            "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+        self.events = register_events()
+        self.logger.info("Registered custom events")
+
+        self.process = Thread(
+            target=super()._start_service, daemon=False, args=(context,)
         )
-        handler.setFormatter(formatter)
-
-        root_logger = logging.getLogger(rpcad.__name__)
-        root_logger.addHandler(handler)
-        root_logger.setLevel(rpcad.RPCAD_LOGLEVEL)
-        handler.setLevel(rpcad.RPCAD_LOGLEVEL)
-
-        logger.info("Starting RPC server addin")
-
-        global EVENTS
-        EVENTS = register_events()
-        logger.info("Registered custom events")
-
-        PROCESS = Thread(target=start_service, daemon=False)
-        PROCESS.start()
+        self.process.start()
 
         time.sleep(0.05)
 
         # need to hold references to events and handlers so that they don't go
         # out of scope unless server failed to start
-        if PROCESS.is_alive():
+        if self.process.is_alive():
             adsk.autoTerminate(False)
         else:
+            self.logger.error("Failed to start service")
             adsk.terminate()
 
-    except:  # noqa: E722
-        if ui:
-            ui.messageBox("Failed:\n{}".format(traceback.format_exc()))  # type: ignore
-    finally:
-        handler.flush()
+    def _stop_service(self, context: Any) -> None:
+        if self.process is not None:
+            self.process.join()
 
-
-def stop(context):
-    ui = None
-    try:
-        app: adsk.core.Application = adsk.core.Application.get()  # type: ignore
-        ui = app.userInterface
-
-        if SERVER is not None:
-            SERVER.close()
-            logger.info("Server closed")
-            SERVER.logger.removeHandler(handler)
-
-        if PROCESS is not None:
-            PROCESS.join()
-
-        if EVENTS is not None:
+        if self.events is not None:
             from rpcad.fusion import unregister_events
 
-            unregister_events(EVENTS.values())
-            logger.info("Events unregistered")
+            unregister_events(self.events.values())
+            self.logger.info("Events unregistered")
 
-    except:  # noqa: E722
-        if ui:
-            ui.messageBox("Failed:\n{}".format(traceback.format_exc()))  # type: ignore
-    finally:
-        handler.flush()
-        handler.close()
-        logging.getLogger("rpcad").removeHandler(handler)
+
+SERVER = FusionServer()
+
+
+def run(context: Any):
+    SERVER.run(context)
+
+
+def stop(context: Any):
+    SERVER.stop(context)

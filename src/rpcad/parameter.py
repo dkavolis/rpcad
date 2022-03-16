@@ -1,12 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding:utf-8 -*-
-"""
-@Author:               Daumantas Kavolis <dkavolis>
-@Date:                 06-Jun-2020
-@Filename:             parameter.py
-@Last Modified By:     Daumantas Kavolis
-@Last Modified Time:   03-Jul-2021
-"""
+
+from __future__ import annotations
 
 
 class Parameter:
@@ -14,5 +9,5 @@ class Parameter:
         self.value = value
         self.expression = expression
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"{self.value} ({self.expression})"

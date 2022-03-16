@@ -1,29 +1,28 @@
 #!/usr/bin/env python3
 # -*- coding:utf-8 -*-
-"""
-@Author:               Daumantas Kavolis <dkavolis>
-@Date:                 05-Jun-2020
-@Filename:             service.py
-@Last Modified By:     Daumantas Kavolis
-@Last Modified Time:   22-Jul-2021
-"""
+
+from __future__ import annotations
 
 from abc import abstractmethod
-from typing import Dict, Union, Type, Iterable, Any, overload
+from typing import TypeVar, Union, Type, Iterable, Any, overload, Dict, List
 import inspect
 import logging
 
 import rpyc
+from rpyc.utils.server import Server, ThreadedServer
+
 from rpcad.common import (
     RPCAD_FALLBACK_PORT,
     RPCAD_HOSTNAME,
     RPCAD_PORT,
 )
 from rpcad.parameter import Parameter
-from rpyc.utils.server import Server, ThreadedServer
 from rpcad.commands import Command, PhysicalProperty, Accuracy
 
 logger = logging.getLogger(__name__)
+
+
+R = TypeVar("R")
 
 
 class CADService(rpyc.Service):
@@ -49,7 +48,7 @@ class CADService(rpyc.Service):
         pass
 
     @abstractmethod
-    def _export_project(self, path: str, *args, **kwargs) -> None:
+    def _export_project(self, path: str, *args: Any, **kwargs: Any) -> None:
         pass
 
     @abstractmethod
@@ -90,7 +89,7 @@ class CADService(rpyc.Service):
     def exposed_close_project(self) -> None:
         self._close_project()
 
-    def exposed_export_project(self, path: str, *args, **kwargs) -> None:
+    def exposed_export_project(self, path: str, *args: Any, **kwargs: Any) -> None:
         self._export_project(path, *args, **kwargs)
 
     def exposed_set_parameters(self, **kwargs: Union[str, float]) -> None:
@@ -117,7 +116,12 @@ class CADService(rpyc.Service):
     ) -> Dict[PhysicalProperty, Any]:
         ...
 
-    def exposed_physical_properties(self, prop, part, accuracy):
+    def exposed_physical_properties(
+        self,
+        prop: Union[PhysicalProperty, Iterable[PhysicalProperty]],
+        part: str,
+        accuracy: Accuracy,
+    ) -> Union[Any, Dict[PhysicalProperty, Any]]:
         if isinstance(prop, PhysicalProperty):
             return self._physical_properties([prop], part, accuracy)[
                 PhysicalProperty(prop.value)
@@ -125,13 +129,13 @@ class CADService(rpyc.Service):
 
         return self._physical_properties(prop, part, accuracy)
 
-    def _invoke_static(self, attr, *args, **kwargs):
+    def _invoke_static(self, attr: Any, *args: Any, **kwargs: Any) -> Any:
         try:
             if isinstance(attr, staticmethod):
-                return attr.__get__(type(self))(*args, **kwargs)
+                return attr.__get__(type(self))(*args, **kwargs)  # type: ignore
 
             if isinstance(attr, classmethod):
-                return attr.__get__(self)(*args, **kwargs)
+                return attr.__get__(self)(*args, **kwargs)  # type: ignore
 
             if inspect.isfunction(attr):
                 return attr(self, *args, **kwargs)
@@ -145,7 +149,7 @@ class CADService(rpyc.Service):
             logger.error(
                 "Error _invoke_static(self=%s, attr=%s, *args=%s, **kwargs=%s)",
                 self,
-                attr,
+                attr,  # type: ignore
                 args,
                 kwargs,
             )
@@ -163,13 +167,13 @@ class CADService(rpyc.Service):
 
         return getattr(self, exposed, None)
 
-    def _execute_batch(self, commands: Iterable[Command]) -> list:
+    def _execute_batch(self, commands: Iterable[Command[R]]) -> List[R]:
         commands = list(commands)
 
         # first validate that commands exist to avoid any long running code
         # before the inevitable crash
-        invalid_commands = []
-        resolved = []
+        invalid_commands: List[str] = []
+        resolved: List[Any] = []
         for command in commands:
             attr = self._find_attribute(command.name)
 
@@ -191,7 +195,7 @@ class CADService(rpyc.Service):
                 command.kwargs,
             )
 
-        results = []
+        results: List[R] = []
         for command, function in zip(commands, resolved):
             results.append(
                 self._invoke_static(function, *command.args, **command.kwargs)
@@ -200,14 +204,16 @@ class CADService(rpyc.Service):
         return results
 
     @overload
-    def exposed_batch_commands(self, commands: Command) -> Any:
+    def exposed_batch_commands(self, commands: Command[R]) -> R:
         ...
 
     @overload
-    def exposed_batch_commands(self, commands: Iterable[Command]) -> list:
+    def exposed_batch_commands(self, commands: Iterable[Command[R]]) -> List[R]:
         ...
 
-    def exposed_batch_commands(self, commands):
+    def exposed_batch_commands(
+        self, commands: Union[Command[R], Iterable[Command[R]]]
+    ) -> Union[R, List[R]]:
         if isinstance(commands, Command):
             return self._execute_batch([commands])[0]
 
@@ -216,11 +222,11 @@ class CADService(rpyc.Service):
     @classmethod
     def create_server(
         cls,
-        *args,
+        *args: Any,
         hostname: str = RPCAD_HOSTNAME,
         port: Union[str, int] = RPCAD_PORT,
         server: Type[Server] = ThreadedServer,
-        **kwargs,
+        **kwargs: Any,
     ) -> Server:
 
         kwargs["protocol_config"] = {

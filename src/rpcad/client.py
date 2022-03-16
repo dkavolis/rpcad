@@ -1,16 +1,20 @@
 #!/usr/bin/env python3
 # -*- coding:utf-8 -*-
-"""
-@Author:               Daumantas Kavolis <dkavolis>
-@Date:                 06-Jun-2020
-@Filename:             client.py
-@Last Modified By:     Daumantas Kavolis
-@Last Modified Time:   22-Jul-2021
-"""
+
+from __future__ import annotations
 
 import os
-from typing import Dict, Union, Any, Iterable, Callable
-from typing import overload as _overload
+from typing import (
+    TYPE_CHECKING,
+    TypeVar,
+    Union,
+    Any,
+    Iterable,
+    Callable,
+    Dict,
+    List,
+)
+from typing import overload
 import inspect
 
 from rpcad.common import BaseClient
@@ -19,12 +23,52 @@ from rpcad.commands import Command, PhysicalProperty, Accuracy
 
 from functools import wraps
 
+if TYPE_CHECKING:
+    from typing_extensions import Concatenate, ParamSpec, Literal
 
-def remote_call(f: Callable):
+    P = ParamSpec("P")
+
+R = TypeVar("R")
+
+# ParamSpec is still limited so there will be a lot of type: ignore comments to shut up
+# mypy, also mypy seems to have other issues with ParamSpec still
+
+
+def remote_call(f: Callable[Concatenate["BaseClient", P], R]):  # type: ignore
+    # ParamSpec cannot yet be concatenated with keyword-only arguments so rely on
+    # language server inferring the return type from the remaining type hints
+
     signature = inspect.signature(f)
 
+    # pyright: reportGeneralTypeIssues=false
+
+    # complains about keyword-only argument after ParamSpec.args
+    # mypy doesn't like ParamSpec, even in 3.10
+    @overload
+    def wrapper(
+        self: BaseClient,
+        *args: P.args,  # type: ignore
+        as_command: Literal[True] = ...,
+        **kwargs: P.kwargs  # type: ignore
+    ) -> Command[R]:
+        ...
+
+    @overload
+    def wrapper(
+        self: BaseClient,
+        *args: P.args,  # type: ignore
+        as_command: Literal[False] = ...,
+        **kwargs: P.kwargs  # type: ignore
+    ) -> R:
+        ...
+
     @wraps(f)
-    def wrapper(self: "BaseClient", *args, as_command: bool = False, **kwargs):
+    def wrapper(
+        self: BaseClient,
+        *args: P.args,  # type: ignore
+        as_command: bool = False,
+        **kwargs: P.kwargs  # type: ignore
+    ) -> Union[Command[R], R]:
         arguments = signature.bind(self, *args, **kwargs)
         arguments.apply_defaults()
 
@@ -37,20 +81,16 @@ def remote_call(f: Callable):
         if as_command:
             # name may be one of the kwargs so set args and kwargs outside the
             # constructor
-            command = Command(name=f.__name__)
+            command: Command[R] = Command(name=f.__name__)
             command.args = arguments.args[1:]
             command.kwargs = arguments.kwargs
             return command
 
-        return getattr(self.connection.root, f.__name__)(
+        return getattr(self.connection.root, f.__name__)(  # type: ignore # unknown root
             *arguments.args[1:], **arguments.kwargs
         )
 
     return wrapper
-
-
-def overload(f: Callable):
-    return _overload(remote_call(f))
 
 
 class Client(BaseClient):
@@ -75,7 +115,7 @@ class Client(BaseClient):
         pass
 
     @remote_call
-    def export_project(self, path: str, *args, **kwargs) -> None:
+    def export_project(self, path: str, *args: Any, **kwargs: Any) -> None:
         pass
 
     @remote_call
@@ -84,7 +124,7 @@ class Client(BaseClient):
 
     @remote_call
     def undo(self, count: int = 1) -> None:
-        pass
+        return self.open_project(path=count, other=1)
 
     @remote_call
     def reload(self) -> None:
@@ -95,29 +135,37 @@ class Client(BaseClient):
         pass
 
     @overload
+    @remote_call
     def physical_properties(
         self, prop: PhysicalProperty, part: str, accuracy: Accuracy
     ) -> Any:
         ...
 
     @overload
+    @remote_call
     def physical_properties(
         self, prop: Iterable[PhysicalProperty], part: str, accuracy: Accuracy
     ) -> Dict[PhysicalProperty, Any]:
         ...
 
     @remote_call
-    def physical_properties(self, prop, part, accuracy=Accuracy.Medium):  # type: ignore
+    def physical_properties(
+        self,
+        prop: Union[PhysicalProperty, Iterable[PhysicalProperty]],
+        part: str,
+        accuracy: Accuracy = Accuracy.Medium,
+    ) -> Union[Any, Dict[str, Any]]:
         pass
 
-    @_overload
-    def batch_commands(self, commands: Command) -> Any:
+    @overload
+    def batch_commands(self, commands: Command[R]) -> R:
         ...
 
-    @_overload
-    def batch_commands(self, commands: Iterable[Command]) -> list:
+    @overload
+    def batch_commands(self, commands: Iterable[Command[R]]) -> List[R]:
         ...
 
-    @remote_call
-    def batch_commands(self, commands):  # type: ignore
-        pass
+    def batch_commands(
+        self, commands: Union[Command[R], Iterable[Command[R]]]
+    ) -> Union[R, List[R]]:
+        return self.connection.root.batch_commands(commands)  # type: ignore

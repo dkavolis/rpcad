@@ -6,7 +6,7 @@
 	"description":	{
 		"":	"RPC server for modifying parametric designs for optimization. Blocks until the connection is made and closed."
 	},
-	"version":	"0.2",
+	"version":	"0.3",
 	"supportedOS":	"windows|mac",
 	"editEnabled":	true
 }

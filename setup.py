@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
     Setup file for rpcad.
@@ -91,15 +92,13 @@ class PostInstallCommand(install):
         self, name: str, python_dir: Optional[Path], addin_dir: Path
     ) -> None:
         source_dir = Path(__file__).absolute().parent
+        main_dir = source_dir / "addins" / "fusion360"
         dst = addin_dir / name
         if os.path.exists(dst):
             shutil.rmtree(dst)
 
         print(f"-- Copying addin to '{addin_dir}'")
-        addin = shutil.copytree(
-            source_dir / "addins" / "fusion360" / name,
-            addin_dir / name,
-        )
+        addin = shutil.copytree(main_dir / name, dst)
         shutil.copytree(source_dir / "src" / "rpcad", addin / "rpcad")
 
         if python_dir is None:
@@ -118,4 +117,4 @@ except VersionConflict:
 
 
 if __name__ == "__main__":
-    setup(use_pyscaffold=True, cmdclass={"install": PostInstallCommand})
+    setup(use_pyscaffold=True, cmdclass={"install": PostInstallCommand})  # type: ignore
