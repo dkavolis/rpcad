@@ -22,7 +22,8 @@ while to slow down memory leaks and increase time between crashes. Oneshot
 server will block until the connection is closed and seems more stable than the
 threaded server. Supports setting and querying parameters, querying physical
 properties, saving and reloading focused projects, exporting bodies to
-supported formats and undoing commands.
+supported formats and undoing commands. On Windows, the Fusion360 addins will
+be automatically installed by running `python setup.py install --user`.
 
 With the addin running in CAD, a basic example with Fusion360:
 

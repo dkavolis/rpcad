@@ -48,7 +48,9 @@ class PostInstallCommand(install):
 
     def install_mac(self):
         print(
-            "Fusion360 Mac paths are not implemented, addin not installed",
+            "Fusion360 Mac paths are not implemented, addin not installed. "
+            "Install manually by copying addins in 'addins/fusion360' to Fusion360 "
+            "addins directory and copying 'src/rpcad' into each.",
             file=sys.stderr,
         )
 
