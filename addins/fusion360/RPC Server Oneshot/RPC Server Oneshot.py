@@ -1,7 +1,6 @@
 # Author-D. Kavolis
 # Description-RPC server for modifying designs.
 
-import pathlib
 from typing import Any
 import sys
 import os
@@ -14,9 +13,6 @@ from rpcad.fusion import BasicFusionAddin  # noqa: E402
 
 
 class FusionServer(BasicFusionAddin):
-    def __init__(self):
-        super().__init__(pathlib.Path(__file__).parent)
-
     def _create_service(self, context: Any) -> None:
         from rpcad.fusion import Fusion360Service
         from rpyc.utils.server import OneShotServer

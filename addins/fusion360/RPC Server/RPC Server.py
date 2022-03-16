@@ -1,7 +1,6 @@
 # Author-D. Kavolis
 # Description-RPC server for modifying designs.
 
-import pathlib
 from threading import Thread
 from typing import Any, Optional, Tuple, Dict
 import time
@@ -19,7 +18,7 @@ from rpcad.fusion import BasicFusionAddin, DispatchHandler  # noqa: E402
 
 class FusionServer(BasicFusionAddin):
     def __init__(self):
-        super().__init__(pathlib.Path(__file__).parent)
+        super().__init__()
         self.process: Optional[Thread] = None
         self.events: Optional[
             Dict[str, Tuple[adsk.core.CustomEvent, DispatchHandler[Any]]]

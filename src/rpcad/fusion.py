@@ -28,6 +28,7 @@ from functools import wraps
 import types
 from rpyc.utils.server import Server
 
+from rpcad.common import RPCAD_LOGDIR
 from rpcad.parameter import Parameter
 from rpcad.service import CADService
 from rpcad.commands import PhysicalProperty, Accuracy
@@ -639,7 +640,7 @@ def cast_parameter(parameter: adsk.fusion.Parameter) -> Parameter:
 
 
 class BasicFusionAddin:
-    def __init__(self, log_dir: pathlib.Path):
+    def __init__(self, log_dir: pathlib.Path = pathlib.Path(RPCAD_LOGDIR)):
         self.server: Optional[Server] = None
         self.logger = logging.getLogger("rpcad.Fusion360.AddIn")
         self.handler = handlers.RotatingFileHandler(
